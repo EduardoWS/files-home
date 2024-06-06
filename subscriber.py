@@ -13,6 +13,10 @@ class DepthSubscriber(Node):
             10)
         self.get_logger().info('Subscription to depth topic initialized.')
 
+        # Inicializar variáveis para armazenar a profundidade mínima
+        self.min_distance = float('inf')
+        self.timer = self.create_timer(2.0, self.timer_callback)
+
     def depth_callback(self, msg):
         self.get_logger().info('Depth message received.')
         
@@ -29,9 +33,15 @@ class DepthSubscriber(Node):
         # Filtrar valores inválidos (zeros) e calcular a distância mínima válida
         valid_depths = depth_array[depth_array > 0]
         if valid_depths.size > 0:
-            min_distance = np.min(valid_depths)
-            self.get_logger().info(f'Minimum valid distance: {min_distance}')
-            if min_distance < 0.5:  # Defina a distância mínima de segurança desejada
+            self.min_distance = np.min(valid_depths)
+        else:
+            self.min_distance = float('inf')
+    
+    def timer_callback(self):
+        # Imprimir a cada 2 segundos com base na distância mínima armazenada
+        if self.min_distance < float('inf'):
+            self.get_logger().info(f'Minimum valid distance: {self.min_distance}')
+            if self.min_distance < 0.5:  # Defina a distância mínima de segurança desejada
                 self.get_logger().info('Algo muito próximo! O robô não pode se mover.')
             else:
                 self.get_logger().info('Nada muito próximo. O robô pode se mover.')
