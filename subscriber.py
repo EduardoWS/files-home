@@ -8,7 +8,7 @@ class DepthSubscriber(Node):
         super().__init__('depth_subscriber')
         self.subscription = self.create_subscription(
             Image,
-            '/kinect2/depth/raw', 
+            '/kinect2/depth/raw',  # Substitua 'depth_topic' pelo nome do tópico do sensor de profundidade
             self.depth_callback,
             10)
         self.get_logger().info('Subscription to depth topic initialized.')
@@ -17,16 +17,26 @@ class DepthSubscriber(Node):
         self.get_logger().info('Depth message received.')
         
         # Converte a mensagem Image para um array numpy
-        depth_array = np.frombuffer(msg.data, dtype=np.float32)
-        depth_array = depth_array.reshape((msg.height, msg.width))
+        try:
+            depth_array = np.frombuffer(msg.data, dtype=np.float32)
+            self.get_logger().info(f'Depth array shape before reshape: {depth_array.shape}')
+            depth_array = depth_array.reshape((msg.height, msg.width))
+            self.get_logger().info(f'Depth array shape after reshape: {depth_array.shape}')
+        except Exception as e:
+            self.get_logger().error(f'Error processing depth message: {e}')
+            return
         
-        # Verificar se há algo muito próximo ao robô
-        min_distance = np.min(depth_array)
-        self.get_logger().info(f'Minimum distance: {min_distance}')
-        if min_distance < 0.5:  # Defina a distância mínima de segurança desejada
-            self.get_logger().info('Algo muito próximo! O robô não pode se mover.')
+        # Filtrar valores inválidos (zeros) e calcular a distância mínima válida
+        valid_depths = depth_array[depth_array > 0]
+        if valid_depths.size > 0:
+            min_distance = np.min(valid_depths)
+            self.get_logger().info(f'Minimum valid distance: {min_distance}')
+            if min_distance < 0.5:  # Defina a distância mínima de segurança desejada
+                self.get_logger().info('Algo muito próximo! O robô não pode se mover.')
+            else:
+                self.get_logger().info('Nada muito próximo. O robô pode se mover.')
         else:
-            self.get_logger().info('Nada muito próximo. O robô pode se mover.')
+            self.get_logger().info('Nenhuma profundidade válida detectada.')
 
 def main(args=None):
     rclpy.init(args=args)
@@ -37,6 +47,7 @@ def main(args=None):
 
 if __name__ == '__main__':
     main()
+
 
 
 
